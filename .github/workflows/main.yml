@@ -14,16 +14,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract source
-        run: unzip src.zip -d .
+      - name: Download bot zip
+        run: |
+          curl -L "${{ secrets.BOT_ZIP_URL }}" -o autobebot.zip
+
+      - name: Extract bot zip
+        run: unzip autobebot.zip -d .
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build TypeScript
         run: npm run build
@@ -34,3 +39,21 @@ jobs:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
         run: npm start
+
+  chain:
+    needs: deploy
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger next run
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy.yml',
+              ref: 'main'
+            });
